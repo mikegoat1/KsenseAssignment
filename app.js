@@ -505,12 +505,12 @@ function processPatients(allPatients) {
 async function main() {
   try {
     console.log("Fetching patients...");
-    // const patients = await fetchPatients();
-    // console.log(`Fetched total ${patients.length} patients.`);
-    // console.log(`Patients: ${patients.map((p) => p.patient_id).join(", ")}`);
-    // console.log("Starting patient data processing...");
-    // const results = processPatients(patients);
-    const results = processPatients(mock_data);
+    const patients = await fetchPatients();
+    console.log(`Fetched total ${patients.length} patients.`);
+    console.log(`Patients: ${patients.map((p) => p.patient_id).join(", ")}`);
+    console.log("Starting patient data processing...");
+    const results = processPatients(patients);
+    // const results = processPatients(mock_data);
     console.log("Processing complete.");
     console.log("High-Risk Patients:", results.highRisk);
     console.log("Fever Patients:", results.feverPatients);
