@@ -421,6 +421,7 @@ function processPatients(allPatients) {
     return risk;
   }
 
+
 function getTemperatureRisk(temp) {
   if (temp == null || typeof temp !== "number" || isNaN(temp)) return 0;
   if (temp <= 99.5) return 0;
@@ -455,7 +456,7 @@ function getTemperatureRisk(temp) {
     const nameInvalid =
       typeof p.name !== "string" ||
       !p.name.trim() ||
-      /(undefined|null|nullish)/i.test(p.name.trim());
+      /undefined|null/i.test(p.name.trim());
 
     const hasInvalidData =
       bpInvalid || ageInvalid || tempInvalid || nameInvalid;
@@ -474,7 +475,6 @@ function getTemperatureRisk(temp) {
     console.log(
       `Patient ${p.patient_id} - BP Risk: ${bpRisk}, Temp Risk: ${tempRisk}, Age Risk: ${ageRisk}, Total Risk: ${totalRisk}`
     );
-    if (tempRisk > 0) feverPatients.push(p.patient_id);
 
     if (hasInvalidData) {
       const invalidReasons = [];
@@ -496,8 +496,9 @@ function getTemperatureRisk(temp) {
         }: ${invalidReasons.join("; ")}`
       );
       dataQualityIssues.push(p.patient_id);
-    } else if (totalRisk > 4) {
-      highRisk.push(p.patient_id);
+    } else {
+      if (tempRisk > 0) feverPatients.push(p.patient_id);
+      if (totalRisk > 4) highRisk.push(p.patient_id);
     }
   }
   return { highRisk, feverPatients, dataQualityIssues };
