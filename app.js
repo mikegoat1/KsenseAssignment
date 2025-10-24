@@ -421,17 +421,13 @@ function processPatients(allPatients) {
     return risk;
   }
 
-  function getBloodPressureRisk(bp) {
-    const { systolic, diastolic } = parseBloodPressure(bp);
-    return getBloodPressureRiskFromValues(systolic, diastolic);
-  }
-
-  function getTemperatureRisk(temp) {
-    if (temp == null || typeof temp !== "number" || isNaN(temp)) return 0;
-    if (temp <= 99.5) return 0;
-    if (temp <= 100.9) return 1;
-    return 2;
-  }
+function getTemperatureRisk(temp) {
+  if (temp == null || typeof temp !== "number" || isNaN(temp)) return 0;
+  if (temp <= 99.5) return 0;
+  if (temp >= 99.6 && temp <= 100.9) return 1;
+  if (temp >= 101.0) return 2;
+  return 0;
+}
 
   function getAgeRisk(age) {
     if (age == null || typeof age !== "number" || isNaN(age)) return 0;
@@ -444,7 +440,9 @@ function processPatients(allPatients) {
     const { systolic, diastolic } = parseBloodPressure(p.blood_pressure);
 
     const bpInvalid =
-      typeof p.blood_pressure !== "string" || systolic == null || diastolic == null;
+      typeof p.blood_pressure !== "string" ||
+      systolic == null ||
+      diastolic == null;
 
     const ageInvalid = typeof p.age !== "number" || Number.isNaN(p.age);
 
@@ -457,9 +455,10 @@ function processPatients(allPatients) {
     const nameInvalid =
       typeof p.name !== "string" ||
       !p.name.trim() ||
-      /undefined|null/i.test(p.name.trim());
+      /(undefined|null|nullish)/i.test(p.name.trim());
 
-    const hasInvalidData = bpInvalid || ageInvalid || tempInvalid || nameInvalid;
+    const hasInvalidData =
+      bpInvalid || ageInvalid || tempInvalid || nameInvalid;
 
     const bpRisk = bpInvalid
       ? 0
@@ -475,6 +474,7 @@ function processPatients(allPatients) {
     console.log(
       `Patient ${p.patient_id} - BP Risk: ${bpRisk}, Temp Risk: ${tempRisk}, Age Risk: ${ageRisk}, Total Risk: ${totalRisk}`
     );
+    if (tempRisk > 0) feverPatients.push(p.patient_id);
 
     if (hasInvalidData) {
       const invalidReasons = [];
@@ -485,23 +485,45 @@ function processPatients(allPatients) {
       if (ageInvalid)
         invalidReasons.push(`Invalid/missing age (raw="${p.age}")`);
       if (tempInvalid)
-        invalidReasons.push(`Invalid temperature value (raw="${p.temperature}")`);
-      if (nameInvalid)
-        invalidReasons.push(`Invalid name (raw="${p.name}")`);
+        invalidReasons.push(
+          `Invalid temperature value (raw="${p.temperature}")`
+        );
+      if (nameInvalid) invalidReasons.push(`Invalid name (raw="${p.name}")`);
 
       console.log(
-        `❌ Data quality issue for patient ${p.patient_id}: ${invalidReasons.join(
-          "; "
-        )}`
+        `❌ Data quality issue for patient ${
+          p.patient_id
+        }: ${invalidReasons.join("; ")}`
       );
       dataQualityIssues.push(p.patient_id);
-    } else {
-      if (tempRisk > 0) feverPatients.push(p.patient_id);
-      if (totalRisk >= 4) highRisk.push(p.patient_id);
+    } else if (totalRisk > 4) {
+      highRisk.push(p.patient_id);
     }
   }
   return { highRisk, feverPatients, dataQualityIssues };
 }
+async function submitResults(results) {
+  try {
+    const response = await fetch(`${Base_URL}/submit-assessment`, {
+      method: "POST",
+      headers: {
+        "x-api-key": API_Key,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(results),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Submission failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log("Submission successful:", data);
+  } catch (error) {
+    console.error(`Error submitting results: ${error.message}`);
+  }
+}
+
 async function main() {
   try {
     console.log("Fetching patients...");
@@ -515,7 +537,15 @@ async function main() {
     console.log("High-Risk Patients:", results.highRisk);
     console.log("Fever Patients:", results.feverPatients);
     console.log("Data Quality Issues:", results.dataQualityIssues);
-    return results;
+    console.log("Complete results:", JSON.stringify(patients.flat(), null, 2));
+    const payload = {
+      high_risk_patients: results.highRisk,
+      fever_patients: results.feverPatients,
+      data_quality_issues: results.dataQualityIssues,
+    };
+    console.log("Submitting results...");
+    await submitResults(payload);
+    console.log("✅ Assessment submitted successfully!");
   } catch (error) {
     console.error(`Error in main: ${error.message}`);
   }
